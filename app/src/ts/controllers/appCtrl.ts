@@ -8,6 +8,6 @@ export class AppCtrl implements IAppCtrl{
 	static $inject: any[] = [];
 
 	constructor(){
-		this.message = 'Message';
+		this.message = 'Messa';
 	}
 }

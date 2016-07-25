@@ -1,29 +1,31 @@
-var gulp = require('gulp'),
-  connect = require('gulp-connect'),
+var argv = require('yargs').argv,
   browserify = require('browserify'),
-  source = require('vinyl-source-stream'),
+  buffer = require('vinyl-buffer'),
+  concat = require('gulp-concat'),
+  connect = require('gulp-connect'),
   del = require('del'),
+  gulp = require('gulp'),
+  gulpif = require('gulp-if'),
+  inject = require('gulp-inject'),
+  mainBowerFiles = require('main-bower-files'),  
+  source = require('vinyl-source-stream'),
   tsify = require('tsify'),
-  mainBowerFiles = require('main-bower-files');
-
+  uglify = require('gulp-uglify')
+  wiredep = require('wiredep').stream,
+  merge = require('merge-stream');
 
 gulp.task('clean-all', function() {
     return del.sync(['app/dist/**/*']);
 });
 
-gulp.task('copy-js', function() {
-    gulp.src(mainBowerFiles())
-      .pipe(gulp.dest('app/dist/js'));
-});
-
-gulp.task('connect', ['clean-all', 'compile-ts','copy-js', 'copy-html'], function() {
-  connect.server({
+gulp.task('connect', ['clean-all', 'partials', 'index'], function() {
+  return connect.server({
     root: 'app/dist',
     livereload: true
   });
 });
 
-gulp.task('compile-ts', function(){
+gulp.task('bundle', function(){
   return browserify({
       basedir: '.',
       debug: false,
@@ -34,44 +36,67 @@ gulp.task('compile-ts', function(){
   .plugin(tsify)
   .bundle()
   .pipe(source('main.js'))
-  .pipe(gulp.dest("app/dist/js"));
-});
-
-gulp.task('ts', function(){
-  return browserify({
-      basedir: '.',
-      debug: false,
-      entries: ['app/src/ts/main.ts'],
-      cache: {},
-      packageCache: {}
-  })
-  .plugin(tsify)
-  .bundle()
-  .pipe(source('main.js'))
+  .pipe(buffer())
+  .pipe(gulpif(argv.production, uglify()))
   .pipe(gulp.dest("app/dist/js"))
   .pipe(connect.reload());
 });
  
-gulp.task('copy-html', function () {
-  gulp.src('./app/src/views/*')
-    .pipe(gulp.dest('./app/dist/views/'));
-
-    gulp.src('./app/src/index.html')
-    .pipe(gulp.dest('./app/dist/'));
-});
-
-gulp.task('html', function () {
-  gulp.src('./app/src/views/*')
-    .pipe(gulp.dest('./app/dist/views/'));
-
-    gulp.src('./app/src/index.html')
-    .pipe(gulp.dest('./app/dist/'))
+gulp.task('partials', function () {  
+  return gulp.src('./app/src/views/*')
+    .pipe(gulp.dest('./app/dist/views/'))
     .pipe(connect.reload());
 });
 
+
+gulp.task('bower', function() {
+    return gulp.src(mainBowerFiles())
+      .pipe(gulpif(argv.production, concat('vendor.js')))
+      .pipe(gulpif(argv.production, uglify()))
+      .pipe(gulpif(argv.production, gulp.dest('app/dist/js')))
+      .pipe(gulpif(!argv.production, gulp.dest('app/dist/js/vendor')));
+});
+
+gulp.task('scripts', ['bower', 'bundle'], function () {
+  if(argv.production){
+    /*var indexCopy = gulp.src('./app/src/index.html')
+      .pipe(gulp.dest('./app/dist'));
+
+    var injectVendorJs = gulp.src('./app/dist/index.html')
+    .pipe(inject(gulp.src('./app/dist/js/vendor.js', {read: false}), {relative: true}))
+    .pipe(gulp.dest('./app/dist/'));
+
+    return merge(indexCopy, injectVendorJs);*/
+
+    return gulp.src('./app/src/index.html')
+      .pipe(gulp.dest('./app/dist'));
+  }else{
+    return gulp.src('./app/src/index.html')
+    .pipe(wiredep({
+          fileTypes: {
+            html: {
+              replace: {
+                js: function(filePath) {
+                  return '<script src="' + 'js/vendor/' + filePath.split('/').pop() + '"></script>';
+                }
+              }
+            }
+          }
+        }))
+    .pipe(gulp.dest('./app/dist/'));
+  }
+  
+});
+
+gulp.task('index', ['scripts'], function(){
+  return gulp.src('./app/dist/index.html')
+    .pipe(inject(gulp.src('./app/dist/js/main.js', {read: false}), {relative: true}))
+    .pipe(gulp.dest('./app/dist/'));
+});
+
 gulp.task('watch', function () {
-  gulp.watch(['./app/src/**/*.ts'], ['ts']);  
-  gulp.watch(['./app/src/**/*.html'], ['html'])
+  return gulp.watch(['./app/src/**/*.ts'], ['bundle']);  
+  return gulp.watch(['./app/src/**/*.html'], ['partials']);
 });
  
 gulp.task('build', ['connect', 'watch']);
