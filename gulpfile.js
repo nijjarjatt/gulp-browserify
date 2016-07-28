@@ -50,26 +50,17 @@ gulp.task('partials', function () {
 
 
 gulp.task('bower', function() {
-    return gulp.src(mainBowerFiles())
-      .pipe(gulpif(argv.production, concat('vendor.js')))
-      .pipe(gulpif(argv.production, uglify()))
-      .pipe(gulpif(argv.production, gulp.dest('app/dist/js')))
-      .pipe(gulpif(!argv.production, gulp.dest('app/dist/js/vendor')));
+  return gulp.src(mainBowerFiles())
+    .pipe(gulpif(argv.production, concat('vendor.js')))
+    .pipe(gulpif(argv.production, uglify()))
+    .pipe(gulpif(argv.production, gulp.dest('app/dist/js')))
+    .pipe(gulpif(!argv.production, gulp.dest('app/dist/js/vendor')));
 });
 
 gulp.task('scripts', ['bower', 'bundle'], function () {
   if(argv.production){
-    /*var indexCopy = gulp.src('./app/src/index.html')
-      .pipe(gulp.dest('./app/dist'));
-
-    var injectVendorJs = gulp.src('./app/dist/index.html')
-    .pipe(inject(gulp.src('./app/dist/js/vendor.js', {read: false}), {relative: true}))
-    .pipe(gulp.dest('./app/dist/'));
-
-    return merge(indexCopy, injectVendorJs);*/
-
     return gulp.src('./app/src/index.html')
-      .pipe(gulp.dest('./app/dist'));
+    .pipe(gulp.dest('./app/dist/'));
   }else{
     return gulp.src('./app/src/index.html')
     .pipe(wiredep({
@@ -90,7 +81,7 @@ gulp.task('scripts', ['bower', 'bundle'], function () {
 
 gulp.task('index', ['scripts'], function(){
   return gulp.src('./app/dist/index.html')
-    .pipe(inject(gulp.src('./app/dist/js/main.js', {read: false}), {relative: true}))
+    .pipe(inject(gulp.src(['./app/dist/js/vendor.js','./app/dist/js/main.js'], {read: false}), {relative: true}))
     .pipe(gulp.dest('./app/dist/'));
 });
 
